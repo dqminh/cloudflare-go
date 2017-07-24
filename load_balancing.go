@@ -43,6 +43,21 @@ type LoadBalancerMonitor struct {
 	ExpectedCodes string              `json:"expected_codes"`
 }
 
+// LoadBalancer represents a load balancer's properties.
+type LoadBalancer struct {
+	ID           string              `json:"id,omitempty"`
+	CreatedOn    *time.Time          `json:"created_on,omitempty"`
+	ModifiedOn   *time.Time          `json:"modified_on,omitempty"`
+	Description  string              `json:"description"`
+	Name         string              `json:"name"`
+	TTL          int                 `json:"ttl"`
+	FallbackPool string              `json:"fallback_pool"`
+	DefaultPools []string            `json:"default_pools"`
+	RegionPools  map[string][]string `json:"region_pools"`
+	PopPools     map[string][]string `json:"pop_pools"`
+	Proxied      bool                `json:"proxied"`
+}
+
 // loadBalancerPoolResponse represents the response from the load balancer pool endpoints.
 type loadBalancerPoolResponse struct {
 	Response
@@ -67,6 +82,19 @@ type loadBalancerMonitorListResponse struct {
 	Response
 	Result     []LoadBalancerMonitor `json:"result"`
 	ResultInfo ResultInfo            `json:"result_info"`
+}
+
+// loadBalancerResponse represents the response from the load balancer endpoints.
+type loadBalancerResponse struct {
+	Response
+	Result LoadBalancer `json:"result"`
+}
+
+// loadBalancerListResponse represents the response from the List Load Balancers endpoint.
+type loadBalancerListResponse struct {
+	Response
+	Result     []LoadBalancer `json:"result"`
+	ResultInfo ResultInfo     `json:"result_info"`
 }
 
 // CreateLoadBalancerPool creates a new load balancer pool.
@@ -215,6 +243,81 @@ func (api *API) ModifyLoadBalancerMonitor(monitor LoadBalancerMonitor) (LoadBala
 	var r loadBalancerMonitorResponse
 	if err := json.Unmarshal(res, &r); err != nil {
 		return LoadBalancerMonitor{}, errors.Wrap(err, errUnmarshalError)
+	}
+	return r.Result, nil
+}
+
+// CreateLoadBalancer creates a new load balancer.
+//
+// API reference: https://api.cloudflare.com/#load-balancers-create-a-load-balancer
+func (api *API) CreateLoadBalancer(zoneID string, lb LoadBalancer) (LoadBalancer, error) {
+	uri := "/zones/" + zoneID + "/load_balancers"
+	res, err := api.makeRequest("POST", uri, lb)
+	if err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errMakeRequestError)
+	}
+	var r loadBalancerResponse
+	if err := json.Unmarshal(res, &r); err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errUnmarshalError)
+	}
+	return r.Result, nil
+}
+
+// ListLoadBalancers lists load balancers configured on a zone.
+//
+// API reference: https://api.cloudflare.com/#load-balancers-list-load-balancers
+func (api *API) ListLoadBalancers(zoneID string) ([]LoadBalancer, error) {
+	uri := "/zones/" + zoneID + "/load_balancers"
+	res, err := api.makeRequest("GET", uri, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, errMakeRequestError)
+	}
+	var r loadBalancerListResponse
+	if err := json.Unmarshal(res, &r); err != nil {
+		return nil, errors.Wrap(err, errUnmarshalError)
+	}
+	return r.Result, nil
+}
+
+// LoadBalancerDetails returns the details for a load balancer.
+//
+// API reference: https://api.cloudflare.com/#load-balancers-load-balancer-details
+func (api *API) LoadBalancerDetails(zoneID, lbID string) (LoadBalancer, error) {
+	uri := "/zones/" + zoneID + "/load_balancers/" + lbID
+	res, err := api.makeRequest("GET", uri, nil)
+	if err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errMakeRequestError)
+	}
+	var r loadBalancerResponse
+	if err := json.Unmarshal(res, &r); err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errUnmarshalError)
+	}
+	return r.Result, nil
+}
+
+// DeleteLoadBalancer disables and deletes a load balancer.
+//
+// API reference: https://api.cloudflare.com/#load-balancers-delete-a-load-balancer
+func (api *API) DeleteLoadBalancer(zoneID, lbID string) error {
+	uri := "/zones/" + zoneID + "/load_balancers/" + lbID
+	if _, err := api.makeRequest("DELETE", uri, nil); err != nil {
+		return errors.Wrap(err, errMakeRequestError)
+	}
+	return nil
+}
+
+// ModifyLoadBalancer modifies a configured load balancer.
+//
+// API reference: https://api.cloudflare.com/#load-balancers-modify-a-load-balancer
+func (api *API) ModifyLoadBalancer(zoneID string, lb LoadBalancer) (LoadBalancer, error) {
+	uri := "/zones/" + zoneID + "/load_balancers/" + lb.ID
+	res, err := api.makeRequest("PUT", uri, lb)
+	if err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errMakeRequestError)
+	}
+	var r loadBalancerResponse
+	if err := json.Unmarshal(res, &r); err != nil {
+		return LoadBalancer{}, errors.Wrap(err, errUnmarshalError)
 	}
 	return r.Result, nil
 }
